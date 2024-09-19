@@ -1,0 +1,15 @@
+[metadata]
+name = "qtparse"
+version = "0.1.0"
+description = "My project description"
+author = "My Name"
+author-email = ""
+license = "MIT"
+
+[tool.flake8]
+max-line-length = 160
+
+[tool.autopep8]
+max_line_length = 160
+in-place = true
+recursive = true
