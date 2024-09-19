@@ -1,3 +1,21 @@
+"""
+Functions for parsing generic QuickTime atoms (without interpreting their payload).
+
+Most function in this module accept a spec parameter that (at the root level) is
+a dictionary of expected atom types and their children. The children can be
+either a dictionary of children or an AtomReadOp enum value, which determines
+whether the atom is merely expected or if it is to be read as well. If the
+atom is not in the spec, it is skipped.
+
+This spec is required mainly because of how classic atoms work. They don't have
+a header that specifies the number of children, so the parser needs to know
+which atoms have children and which don't, and what kinds of children to expect
+at which level of the tree. It is also used for QT atoms as an additional check.
+
+Walking of the atom tree is done recursively and as we do so, we descend down
+the spec tree as well.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -94,7 +112,30 @@ def tell_qt_container(buf: BufferedReader) -> bool:
 
 
 def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
-    """Read an atom from the buffer."""
+    """
+    Read a classic atom from the buffer.
+
+    Parameters
+    ----------
+    buf : BufferedReader
+        The buffer to read from.
+    file_size : int
+        The size of the file.
+    parent : Optional[Atom], optional
+        The parent atom, by default None.
+    spec : Optional[Dict], optional
+        The spec for the atom, if None the default spec is used.
+    raise_on_unknown : bool, optional
+        Raise an error if an unknown atom is encountered, by default False.
+
+    Returns
+    -------
+    Atom
+        The atom that was read.
+    """
+    if spec is None:
+        spec = DEFAULT_SPEC
+
     start = buf.tell()
     # read atom size and type
     size, atom_type = unpack('>I4s', safe_read(buf, 8))
@@ -143,7 +184,33 @@ def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom
 
 
 def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
-    """Read an atom from the buffer."""
+    """
+    Read a QT atom from the buffer.
+
+    This does not include the 12 byte QT atom container header, which needs to
+    have been read already.
+
+    Parameters
+    ----------
+    buf : BufferedReader
+        The buffer to read from.
+    file_size : int
+        The size of the file.
+    parent : Optional[Atom], optional
+        The parent atom, by default None.
+    spec : Optional[Dict], optional
+        The spec for the atom, if None the default spec is used.
+    raise_on_unknown : bool, optional
+        Raise an error if an unknown atom is encountered, by default False.
+
+    Returns
+    -------
+    Atom
+        The atom that was read
+    """
+    if spec is None:
+        spec = DEFAULT_SPEC
+
     start = buf.tell()
     # read atom size and type
     size, atom_type = unpack('>I4s', safe_read(buf, 8))
@@ -194,7 +261,10 @@ def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = N
 
 
 def read_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
-    """Read an atom from the buffer."""
+    """Read an atom from the buffer, classic or QT."""
+    if spec is None:
+        spec = DEFAULT_SPEC
+
     if tell_qt_container(buf):
         return read_qt_atom(buf, file_size, parent, spec, raise_on_unknown)
     else:
@@ -205,6 +275,7 @@ def read_atoms(buf: BufferedReader, file_size: int, spec: Optional[Dict] = None,
     """Read all atoms from the buffer."""
     if spec is None:
         spec = DEFAULT_SPEC
+
     atoms = []
     while True:
         try:

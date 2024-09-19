@@ -1,4 +1,5 @@
 """Parse QuickTime files and print height and width of any video tracks as well as sample rate of any audio tracks."""
+
 from argparse import ArgumentParser
 from pathlib import Path
 

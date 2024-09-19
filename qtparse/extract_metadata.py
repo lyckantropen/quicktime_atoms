@@ -1,4 +1,5 @@
-"""Functions for extracting metadata from QuickTime files."""
+"""Functions for extracting specific metadata (height, width and sample rate) from QuickTime files."""
+
 from pathlib import Path
 
 from .atom_parsers import HdlrAtom, StsdSoundAtom, TkhdAtom
