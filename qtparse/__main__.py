@@ -2,8 +2,8 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-from .extract_metadata import extract_track_size_and_sample_rate
-from .qt_atoms import read_atoms
+from qtparse.extract_metadata import extract_track_size_and_sample_rate
+from qtparse.qt_atoms import read_atoms
 
 
 def print_all_atoms_in_file(filename: str, strict: bool = False) -> None:
