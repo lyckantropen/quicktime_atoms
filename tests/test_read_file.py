@@ -1,10 +1,10 @@
 from copy import deepcopy
 from io import BytesIO
-from struct import pack
 from pathlib import Path
+from struct import pack
 
-from qtparse.qt_atoms import read_atoms, get_atoms_by_type
-from qtparse.atom_parsers import TkhdAtom, HdlrAtom, StsdSoundAtom
+from qtparse.atom_parsers import HdlrAtom, StsdSoundAtom, TkhdAtom
+from qtparse.qt_atoms import get_atoms_by_type, read_atoms
 
 
 def test_read_file():
@@ -14,9 +14,9 @@ def test_read_file():
     with open(file_path, mode='rb') as f:
         atoms = read_atoms(f, file_size)
 
-    stsd_atoms = get_atoms_by_type(atoms, ['trak'])
+    tracks = get_atoms_by_type(atoms, ['trak'])
 
-    for atom in stsd_atoms:
+    for atom in tracks:
         hdlr_unparsed = get_atoms_by_type(atom.children, ['hdlr'])[0]
         hdlr = HdlrAtom.from_payload_bytes(hdlr_unparsed.data)
         if hdlr.component_subtype == 'vide':
@@ -79,7 +79,7 @@ MIXED_ATOM_TREE = [{
 }]
 
 
-def build_atom_tree(atom_tree):
+def _build_file(atom_tree):
     buf = BytesIO()
     atom_tree = deepcopy(atom_tree)
 
@@ -131,7 +131,7 @@ def build_atom_tree(atom_tree):
 
 
 def test_read_mixed_qt_file():
-    file_bytes, result = build_atom_tree(MIXED_ATOM_TREE)
+    file_bytes, result = _build_file(MIXED_ATOM_TREE)
     buf = BytesIO(file_bytes)
 
     atoms = read_atoms(buf)

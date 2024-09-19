@@ -1,10 +1,43 @@
-[metadata]
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
 name = "qtparse"
 version = "0.1.0"
-description = "My project description"
-author = "My Name"
-author-email = ""
-license = "MIT"
+description = "A Python package to parse QuickTime files"
+authors = [{name = "Karol Trojanowski", email = "trojanowski.ifuj@gmail.com"}]
+license = {text = "Proprietary"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "License :: Proprietary",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+]
+requires-python = ">= 3.7, <4"
+
+[tool.setuptools]
+packages = ["qtparse"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.optional-dependencies]
+tests = ["pytest", "flake8", "flake8-isort", "mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.flake8]
 max-line-length = 160

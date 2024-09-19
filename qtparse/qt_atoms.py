@@ -58,7 +58,8 @@ DEFAULT_SPEC: Dict[str, Union[Dict, AtomReadOp]] = {
     'mdat': AtomReadOp.SKIP,
     'free': AtomReadOp.SKIP,
     'skip': AtomReadOp.SKIP,
-    'wide': AtomReadOp.SKIP
+    'wide': AtomReadOp.SKIP,
+    'pnot': AtomReadOp.SKIP,
 }
 
 
@@ -72,8 +73,12 @@ class Atom:
     id: Optional[int] = None  # only filled in QT atoms
     children: List[Atom] = field(default_factory=list)
 
-    def __hash__(self) -> int:
-        return hash((self.size, self.type, self.data, self.id, tuple(self.children)))
+    def as_string(self, level: int = 0) -> str:
+        """Return a string representation of the atom tree."""
+        repr = f'{"  " * level}- {self.type} ({self.size})'
+        for child in self.children:
+            repr += '\n' + child.as_string(level + 1)
+        return repr
 
 
 def tell_qt_container(buf: BufferedReader) -> bool:
@@ -86,7 +91,7 @@ def tell_qt_container(buf: BufferedReader) -> bool:
     return False
 
 
-def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
     """Read an atom from the buffer."""
     start = buf.tell()
     # read atom size and type
@@ -105,6 +110,9 @@ def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom
 
     if isinstance(spec, Dict):
         if atom_type not in spec:
+            # unknown root atom, raise error
+            if parent is None and raise_on_unknown:
+                raise ValueError(f'Unknown root atom type: {atom_type}')
             # unknown atom type, skip
             buf.seek(payload_size, 1)
             return Atom(size, atom_type)
@@ -132,7 +140,7 @@ def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom
         raise ValueError(f'Invalid spec value: {spec}')
 
 
-def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
     """Read an atom from the buffer."""
     start = buf.tell()
     # read atom size and type
@@ -152,6 +160,9 @@ def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = N
 
     if atom_type != ROOT_QT_ATOM and isinstance(spec, Dict):
         if atom_type not in spec:
+            # unknown root atom, raise error
+            if parent is None and raise_on_unknown:
+                raise ValueError(f'Unknown root atom type: {atom_type}')
             # unknown atom type, skip
             buf.seek(payload_size, 1)
             return Atom(size, atom_type)
@@ -180,22 +191,22 @@ def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = N
     return atom
 
 
-def read_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> Atom:
     """Read an atom from the buffer."""
     if tell_qt_container(buf):
-        return read_qt_atom(buf, file_size, parent, spec)
+        return read_qt_atom(buf, file_size, parent, spec, raise_on_unknown)
     else:
-        return read_classic_atom(buf, file_size, parent, spec)
+        return read_classic_atom(buf, file_size, parent, spec, raise_on_unknown)
 
 
-def read_atoms(buf: BufferedReader, file_size: int, spec=None) -> List[Atom]:
+def read_atoms(buf: BufferedReader, file_size: int, spec: Optional[Dict] = None, raise_on_unknown: bool = False) -> List[Atom]:
     """Read all atoms from the buffer."""
     if spec is None:
         spec = DEFAULT_SPEC
     atoms = []
     while True:
         try:
-            atoms.append(read_atom(buf, file_size, None, spec=spec))
+            atoms.append(read_atom(buf, file_size, None, spec, raise_on_unknown))
         except EOFError:
             break
     return atoms

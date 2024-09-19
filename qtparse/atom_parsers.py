@@ -75,7 +75,7 @@ class HdlrAtom:
 
 @dataclass
 class StsdSoundSampleDesc:
-    """Sound sample description atom."""
+    """Sound sample description table entry."""
 
     sample_description_size: int
     data_format: int
@@ -88,7 +88,7 @@ class StsdSoundSampleDesc:
     compression_id: int
     packet_size: int
     sample_rate: float
-    _size: int = field(init=False, default=36)
+    _size: int = 36
 
     @classmethod
     def from_payload_bytes(cls, payload: bytes) -> StsdSoundSampleDesc:
