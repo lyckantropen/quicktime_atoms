@@ -11,5 +11,3 @@ max-line-length = 160
 
 [tool.autopep8]
 max_line_length = 160
-in-place = true
-recursive = true

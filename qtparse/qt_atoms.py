@@ -9,19 +9,19 @@ from typing import Dict, List, Optional, Union
 ROOT_QT_ATOM = 'sean'
 
 
-class AtomReadOp(Enum):
-    """Enum for specifying how to read an atom."""
-
-    READ = 0
-    SKIP = 1
-
-
 def safe_read(buf: BufferedReader, size: int) -> bytes:
     """Read exactly `size` bytes from the buffer, raise EOFError if not enough data is available."""
     data = buf.read(size)
     if len(data) != size:
         raise EOFError()
     return data
+
+
+class AtomReadOp(Enum):
+    """Enum for specifying how to read an atom."""
+
+    READ = 0  # read entire payload as bytes
+    SKIP = 1  # skip payload
 
 
 # if an atom has no children in the spec it doesn't mean it doesn't have any, it
@@ -33,7 +33,7 @@ DEFAULT_SPEC: Dict[str, Union[Dict, AtomReadOp]] = {
             'tkhd': AtomReadOp.READ,
             'mdia': {
                 'mdhd': AtomReadOp.SKIP,
-                'hdlr': AtomReadOp.SKIP,
+                'hdlr': AtomReadOp.READ,
                 'minf': {
                     'vmhd': AtomReadOp.SKIP,
                     'dinf': {
@@ -69,15 +69,15 @@ class Atom:
     size: int
     type: str
     data: bytes = b''
-    id: Optional[int] = None
+    id: Optional[int] = None  # only filled in QT atoms
     children: List[Atom] = field(default_factory=list)
 
     def __hash__(self) -> int:
-        return hash(self.size, self.type, self.data, self.id, tuple(self.children))
+        return hash((self.size, self.type, self.data, self.id, tuple(self.children)))
 
 
 def tell_qt_container(buf: BufferedReader) -> bool:
-    """Check if the current position in the buffer is the start of a QuickTime container."""
+    """Check if the current position in the buffer is the start of a QT atom container."""
 
     if safe_read(buf, 12) == b'\0\0\0\0\0\0\0\0\0\0\0\0':
         return True
@@ -86,16 +86,16 @@ def tell_qt_container(buf: BufferedReader) -> bool:
     return False
 
 
-def read_classic_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_classic_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
     """Read an atom from the buffer."""
     start = buf.tell()
+    # read atom size and type
     size, atom_type = unpack('>I4s', safe_read(buf, 8))
     atom_type = atom_type.decode('ascii')
 
     if size == 0:
         assert parent is None, 'Invalid atom size 0 for non-root atom'
-        # TODO: process root atom (to the end of file)
-
+        size = file_size - start
     elif size == 1:
         # read extended size
         size = int.from_bytes(safe_read(buf, 8), 'big')
@@ -117,7 +117,7 @@ def read_classic_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: 
         atom = Atom(size, atom_type)
         offset_in_payload = 0
         while offset_in_payload < payload_size:
-            child = read_atom(buf, atom, spec)
+            child = read_atom(buf, file_size, atom, spec)
             atom.children.append(child)
             offset_in_payload += child.size
         return atom
@@ -132,9 +132,10 @@ def read_classic_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: 
         raise ValueError(f'Invalid spec value: {spec}')
 
 
-def read_qt_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_qt_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
     """Read an atom from the buffer."""
     start = buf.tell()
+    # read atom size and type
     size, atom_type = unpack('>I4s', safe_read(buf, 8))
     atom_type = atom_type.decode('ascii')
 
@@ -142,6 +143,8 @@ def read_qt_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optio
         assert atom_type == ROOT_QT_ATOM, f'Invalid type for root QT atom: {atom_type}'
 
     atom = Atom(size, atom_type)
+
+    # read rest of QT atom header
     atom.id, child_count = unpack('>I2xH4x', safe_read(buf, 12))
 
     payload_offset = buf.tell() - start
@@ -157,7 +160,7 @@ def read_qt_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optio
             spec = spec[atom_type]
 
     for _ in range(child_count):
-        child = read_atom(buf, atom, spec)
+        child = read_atom(buf, file_size, atom, spec)
         atom.children.append(child)
 
     if child_count == 0:
@@ -177,22 +180,32 @@ def read_qt_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optio
     return atom
 
 
-def read_atom(buf: BufferedReader, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
+def read_atom(buf: BufferedReader, file_size: int, parent: Optional[Atom] = None, spec: Optional[Dict] = None) -> Atom:
     """Read an atom from the buffer."""
     if tell_qt_container(buf):
-        return read_qt_atom(buf, parent, spec)
+        return read_qt_atom(buf, file_size, parent, spec)
     else:
-        return read_classic_atom(buf, parent, spec)
+        return read_classic_atom(buf, file_size, parent, spec)
 
 
-def read_atoms(buf: BufferedReader, spec=None) -> List[Atom]:
+def read_atoms(buf: BufferedReader, file_size: int, spec=None) -> List[Atom]:
     """Read all atoms from the buffer."""
     if spec is None:
         spec = DEFAULT_SPEC
     atoms = []
     while True:
         try:
-            atoms.append(read_atom(buf, None, spec=spec))
+            atoms.append(read_atom(buf, file_size, None, spec=spec))
         except EOFError:
             break
     return atoms
+
+
+def get_atoms_by_type(atoms: List[Atom], atom_types: List[str]) -> List[Atom]:
+    """Get all atoms from a tree structure with the specified type."""
+    result = []
+    for atom in atoms:
+        if atom.type in atom_types:
+            result.append(atom)
+        result.extend(get_atoms_by_type(atom.children, atom_types))
+    return result
