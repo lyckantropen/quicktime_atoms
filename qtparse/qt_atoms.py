@@ -24,8 +24,10 @@ class AtomReadOp(Enum):
     SKIP = 1  # skip payload
 
 
-# if an atom has no children in the spec it doesn't mean it doesn't have any, it
-# means that they should be ignored
+# This spec describes all the atoms that are recognized by the parser. Only some
+# are read in full, others are skipped. It is not exhaustive. If an atom has no
+# children in the spec it doesn't mean it doesn't have any, it means that they
+# should be ignored.
 DEFAULT_SPEC: Dict[str, Union[Dict, AtomReadOp]] = {
     'ftyp': AtomReadOp.SKIP,
     'moov': {

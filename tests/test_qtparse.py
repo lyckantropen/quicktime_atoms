@@ -5,10 +5,16 @@ from struct import pack
 
 from qtparse.atom_parsers import HdlrAtom, StsdSoundAtom, TkhdAtom
 from qtparse.qt_atoms import get_atoms_by_type, read_atoms
+from qtparse.extract_metadata import extract_track_size_and_sample_rate
+
+
+def test_extract_track_size_and_sample_rate():
+    metadata = extract_track_size_and_sample_rate('test_content/sample.mov')
+
+    assert metadata == [{'type': 'vide', 'height': 320.0, 'width': 560.0}, {'type': 'soun', 'sample_rate': 44100}]
 
 
 def test_read_file():
-    # with open('test_content/file_example_MOV_480_700kB.mov', mode='rb') as f:
     file_path = Path('test_content/sample.mov')
     file_size = file_path.stat().st_size
     with open(file_path, mode='rb') as f:
@@ -134,6 +140,6 @@ def test_read_mixed_qt_file():
     file_bytes, result = _build_file(MIXED_ATOM_TREE)
     buf = BytesIO(file_bytes)
 
-    atoms = read_atoms(buf)
+    atoms = read_atoms(buf, len(file_bytes))
 
     assert len(atoms) == 1
