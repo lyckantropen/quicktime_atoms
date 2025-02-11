@@ -1,6 +1,6 @@
-# Telestream homework
+# QuickTime Atoms
 
-Homework for Telestream recruitment.
+Homework I did for a recruitment.
 
 The entry point for the script is `qtparse/__main__.py`.
 
