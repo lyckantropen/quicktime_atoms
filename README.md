@@ -1,6 +1,6 @@
 # QuickTime Atoms
 
-Homework I did for a recruitment.
+Tools for parsing QuickTime container files.
 
 The entry point for the script is `qtparse/__main__.py`.
 
